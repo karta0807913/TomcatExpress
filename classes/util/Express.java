@@ -9,21 +9,12 @@ import util.FileUtils;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.lang3.StringUtils;
+import org.json.*;
 // import javax.servlet.http.HttpServletRequest;
 // import javax.servlet.http.HttpServletResponse;
-
-class ExpressRequestWrapper extends HttpServletRequestWrapper {
-    String requestPath;
-    ExpressRequestWrapper(HttpServletRequest request, String requestPath) {
-        super(request);
-        this.requestPath = requestPath;
-    }
-    public java.lang.String getServletPath() {
-        return requestPath;
-    }
-}
 
 public class Express {
     private static Express express;
@@ -130,8 +121,9 @@ public class Express {
         for(int i = 0; i < patterns.length; ++i) {
             String[] current_path = new String[patterns.length - i];
             System.arraycopy(patterns, i, current_path, 0, current_path.length);
-            HttpServletRequestWrapper requestWrapper = new ExpressRequestWrapper(req, StringUtils.join(current_path, "/"));
-            if(!use_helper(path, requestWrapper, res)) {
+            ExpressRequestWrapper requestWrapper = new ExpressRequestWrapper(req, StringUtils.join(current_path, "/"));
+            ExpressResponseWrapper responseWrapper = new ExpressResponseWrapper(req, res);
+            if(!use_helper(path, requestWrapper, responseWrapper)) {
                 return;
             }
             if(path.charAt(path.length() - 1) == '/') {
@@ -140,7 +132,9 @@ public class Express {
                 path += '/' + patterns[i];
             }
         }
-        if(!handle_helper(path, handleMap, req, res)) {
+        ExpressRequestWrapper requestWrapper = new ExpressRequestWrapper(req, path);
+        ExpressResponseWrapper responseWrapper = new ExpressResponseWrapper(req, res);
+        if(!handle_helper(path, handleMap, requestWrapper, responseWrapper)) {
             return;
         }
         res.sendError(HttpServletResponse.SC_NOT_FOUND);
@@ -148,10 +142,6 @@ public class Express {
 
     public static interface ExpressHandler {
         public boolean handle(HttpServletRequest req, HttpServletResponse res) throws ServletException, java.io.IOException;
-    }
-
-    public static interface ExpressErrorHandler {
-        public boolean handle(Exception e, HttpServletRequest req, HttpServletResponse res);
     }
 
     public static class FileHandler implements ExpressHandler {
